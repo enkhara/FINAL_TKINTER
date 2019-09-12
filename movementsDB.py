@@ -38,23 +38,23 @@ def CryptosDBInformed(cryptos):
     conn.commit()
     conn.close()
 
-def dicCryptos():
+def listCryptos():
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
 
     query = '''
-            SELECT id, symbol FROM cryptos;
+            SELECT symbol, name FROM cryptos;
     '''
     rows=cursor.execute(query)
-    cryptos={}
+    cryptos=[]
     for row in rows:
-        cryptos[row[o]] = row[1]
+        cryptos.append(row)
     
     conn.close()
     return cryptos
 
 def printMovementsDB():
-    dcryptos = dicCryptos()
+    
 
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
@@ -64,39 +64,76 @@ def printMovementsDB():
     movements = []
     for row in rows:
         row = list(row)
-        row[2] = dcryptos[2]
-        row[4] = dcryptos[4]
         movements.append(row)
 
     conn.close()
     return(movements) 
 
 def addNewMovement(movement):
-    dcryptos = dicCryptos()
+   
     
     conn =  sqlite3.connect(database)
     cursor = conn.cursor()
-
-    movement[2] = dcryptos[2]
-    movement[4] = dcryptos[4]
 
     query = '''
         INSERT INTO movements
                (data, time, from_currency, from_quantity, to_currency, to_quantity)
                values (?, ?, ?, ?, ?, ?);
             '''
-         try:
-            rows = cursor.execute(query, ( movement['data'],
-                                          movement['time'],
-                                          movement['from_currency'], 
-                                          movement['from_quantity'],
-                                          movement['to_currency'],
-                                          movement['to_quantity'],
-            ))
-         except sqlite3.Error as e:
-            #form.monedaComprada.data=str(form.monedaComprada.data)
-            #form.monedaPagada.data = str(form.monedaPagada.data)
-             print('Error en base de datos : {}'.format(e))
+    try:
+        rows = cursor.execute(query, ( movement['data'],
+                                        movement['time'],
+                                        movement['from_currency'], 
+                                        movement['from_quantity'],
+                                        movement['to_currency'],
+                                        movement['to_quantity'],
+        ))
+    except sqlite3.Error as e:
+        
+        print('Error en base de datos : {}'.format(e))
     
     conn.commit()
     conn.close()
+
+def MoneySpendFromEURDB():
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    query = '''
+        SELECT from_quantity
+        FROM movements
+        WHERE from_currency in (SELECT id
+                                FROM cryptos
+                                WHERE symbol=?);
+    '''
+    rows= cursor.execute(query, ('EUR',))
+    for row in rows:
+        #sumar todas las cantidades
+        print(row)
+    conn.close()
+    #return (resultado) 
+    
+def MoneySpendTOEURDB():
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    query = '''
+        SELECT to_quantity
+        FROM movements
+        WHERE to_currency in (  SELECT id
+                                FROM cryptos
+                                WHERE symbol = ?);
+    '''
+    rows = cursor.execute(query('EUR',))
+    for row in rows:
+        print(row)
+        #sumar todos los valores
+    conn.close()
+    #devolver valores
+
+cryptos=listCryptos()
+print(cryptos[0])
+print(cryptos[1])
+
+for crypto in cryptos:
+    print(crypto[0])
