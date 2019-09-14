@@ -2,4 +2,4 @@ config.ini
 .vscode/
 prueba.py
 env/
-_pychache_
+_pychache_/

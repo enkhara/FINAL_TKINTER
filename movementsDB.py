@@ -47,8 +47,10 @@ def listCryptos():
     '''
     rows=cursor.execute(query)
     cryptos=[]
+    text=''
     for row in rows:
-        cryptos.append(row)
+        text= '{} - {}'.format(row[0], row[1])
+        cryptos.append(text)
     
     conn.close()
     return cryptos
@@ -124,16 +126,40 @@ def MoneySpendTOEURDB():
                                 FROM cryptos
                                 WHERE symbol = ?);
     '''
-    rows = cursor.execute(query('EUR',))
+    rows = cursor.execute(query,('EUR',))
     for row in rows:
         print(row)
         #sumar todos los valores
     conn.close()
     #devolver valores
 
-cryptos=listCryptos()
-print(cryptos[0])
-print(cryptos[1])
+def MoneySpend(crypto, isfrom=True ):
+    if isfrom:
+        fieldSelect = 'from_quantity'
+        fieldWhere = 'from_currency'
+    else:
+        fieldSelect = 'to_quantity'
+        fieldWhere = 'to_currency'
 
-for crypto in cryptos:
-    print(crypto[0])
+    conn =sqlite3.connect(database)
+    cursor = conn.cursor()
+    
+    query = '''
+        SELECT  {}
+        FROM movements
+        WHERE {} in (   SELECT id
+                        FROM cryptos
+                        WHERE symbol = ?);
+    '''.format(fieldSelect, fieldWhere)
+
+    try:
+        rows=cursor.execute(query,(crypto,))
+        valor=0
+        for row in rows:
+            valor+=row[0]
+            
+    except Exception as e:
+        print('Error en base de datos:',e)
+    conn.close()
+    return(valor)
+
