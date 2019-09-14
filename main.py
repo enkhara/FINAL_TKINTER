@@ -1,6 +1,7 @@
 from tkinter import *
 from tkinter import ttk
-from datetime import datetime
+import time
+import datetime
 import configparser
 import json
 import movementsDB
@@ -31,9 +32,27 @@ class Movements(ttk.Frame):
         
         for i in range (0, 7):
             self.lblDisplay = ttk.Label(self, text=self._head[i], font=font, width = 11, background ='white', borderwidth=1,relief=GROOVE, anchor=CENTER)
-            self.lblDisplay.grid(row=0, column=i)
+            self.lblDisplay.grid(row=0, column=i, pady=_pady)
             self.lblDisplay.grid_propagate(0)
-        yscrollbar.grid(row=1, column=i+1)
+        #yscrollbar.grid(row=1, column=i+1)
+        movements=movementsDB.printMovementsDB()
+        j=0
+        for movement in movements:
+            j+=1
+            i=0
+            while i <=6:
+                if i ==6:
+                    unitPrice=movement[3]/movement[5]
+                    unitPrice='{0:.2f}'.format(unitPrice)
+                    movement.append(unitPrice)
+                if i == 2 or i == 4:
+                    movement[i] = movementsDB.getIdFromToCryptoDB(movement[i],FALSE)
+                self.lblDisplay = ttk.Label(self, text=movement[i], font='Verdana, 10', width = 14, background ='white', borderwidth=1,relief=GROOVE, anchor=CENTER)
+                self.lblDisplay.grid(row=j, column=i)
+                self.lblDisplay.grid_propagate(0)
+                i+=1
+
+
         
     #funcion button1   
     def newMovement(self):
@@ -86,11 +105,11 @@ class NewTransaction(ttk.Frame):
         self.toCryptoCombo.grid(column=3, row=1)
         self.valuesComboBox()
 
-        self.acceptButton = ttk.Button(self, text='Aceptar', command=lambda: self.addNewTransactionIntoDB(), state='disable')
+        self.acceptButton = ttk.Button(self, text='Aceptar', command=lambda: self.checkTransaction(), state='disable')
         self.acceptButton.grid(column=4, row=1, padx=60, pady=_pady)
-        self.cancelButton = ttk.Button(self, text='Cancelar', command=lambda: self.switchNewTransaction(FALSE,FALSE,TRUE), state='disable')
+        self.cancelButton = ttk.Button(self, text='Cancelar', command=lambda: self.switchNewTransaction(FALSE,TRUE), state='disable')
         self.cancelButton.grid(column=4, row=2, padx=30, pady=_pady)
-        self.checkButton = ttk.Button(self, text = 'Comprobar', command =lambda: self.checkTransaction(), state='disable')
+        self.checkButton = ttk.Button(self, text = 'Comprobar', command =lambda: self.checkTransaction(FALSE), state='disable')
         self.checkButton.grid(column=4, row=3, padx=30, pady=_pady)
 
     def whatCrypto(self,crypto):
@@ -108,7 +127,9 @@ class NewTransaction(ttk.Frame):
         self._from =self.whatCrypto(strtxt)
         
         if self._from != 'EUR':
-            self.cryptoInvertida = movementsDB.MoneySpend(self._from)
+            calculateCryptoto=movementsDB.MoneySpend(self._from,FALSE)
+            calculateCryptofrom=movementsDB.MoneySpend(self._from)
+            self.cryptoInvertida = calculateCryptoto - calculateCryptofrom
             if self.cryptoInvertida == 0:
                 self.controlErrorCryptos.config(text='no ha invertido en {}'.format(self._from))
                 self.entryValidationFrom()
@@ -123,17 +144,26 @@ class NewTransaction(ttk.Frame):
         
     def entryValidationFrom(self, *args):
         #validamos que solo permita entrar números y que si esta informado el tipo de monedas el valor no sea superior a las que tengamos, excepto que el tipo de moneda sea euro
+        valorMAximoPermitidoApi = 1000000000
         try:
             v=float(self.strFrom_Q.get())
-            self.strOldFrom_Q = self.strFrom_Q.get()
-            if self._from != 'EUR':
-                self.cryptoInvertida=str(self.cryptoInvertida)
-                if self.cryptoInvertida < self.strFrom_Q.get():
-                    self.controlErrorCryptos.config(text='Su saldo actual de {} es de: {}. No podrá realizar la operación, modifique el valor o la moneda'.format(self._from,self.cryptoInvertida))
-                    self.strFrom_Q.set(self.cryptoInvertida)
-                    self.strOldFrom_Q=self.cryptoInvertida
-                    if self.strFrom_Q.get() > self.cryptoInvertida:
-                        self.strFrom_Q.set(self.strOldFrom_Q)
+            if v <= valorMAximoPermitidoApi:
+                self.strOldFrom_Q = self.strFrom_Q.get()
+                if v <= valorMAximoPermitidoApi and self._from == 'EUR':
+                    self.controlErrorCryptos.config(text='')
+                if self._from != 'EUR':
+                    #self.cryptoInvertida=str(self.cryptoInvertida)
+                    if self.cryptoInvertida < v:
+                        self.controlErrorCryptos.config(text='Su saldo actual de {} es de: {}. No podrá realizar la operación, modifique el valor o la moneda'.format(self._from,self.cryptoInvertida))
+                        self.strFrom_Q.set(self.cryptoInvertida)
+                        self.strOldFrom_Q=self.cryptoInvertida
+                        if float(self.strFrom_Q.get()) > self.cryptoInvertida:
+                            self.strFrom_Q.set(self.strOldFrom_Q)
+                    else:
+                        self.controlErrorCryptos.config(text='')
+            else:
+                self.strFrom_Q.set(self.strOldFrom_Q)
+                self.controlErrorCryptos.config(text='El valor introducido debe ser menor a 1000000000')
         except Exception as e:
             self.strFrom_Q.set(self.strOldFrom_Q)
             print('error',e)
@@ -143,40 +173,50 @@ class NewTransaction(ttk.Frame):
         values= json.loads(response)
         valorQ = values['data']['quote'][cryptoname]['price']
         priceU = float(self.strFrom_Q.get())/valorQ
+        valorQ="{0:.2f}".format(valorQ)
+        priceU="{0:.2f}".format(priceU)
         self.to_QLbl.config(text=valorQ)
         self.pULbl.config(text=priceU)
         return(valorQ)
         
       
-    def checkTransaction(self):
+    def checkTransaction(self,addDB=TRUE):
         #verificamos que todos los campos esten informados y que las cryptos de to y from sean distintas, si se cumple todo esto hacemos la llamada
-        strtxt=self.getFromCrypto.get()
-        _from = self.whatCrypto(strtxt)
-        strtxt = self.getToCrypto.get()
-        _to = self.whatCrypto(strtxt)
-        if _from !=' ' and _to != ' ' and _from != _to:
-            if self.strFrom_Q.get() != '0':
-                try:
-                    url= price_conversion.format(self.strFrom_Q.get(),_from, _to, api_key)
-                    response=api_acces.accesoAPI(url)
-                    self.cryptoPriceTo=self.processingApiInfo(response,_to)
-                except Exception as e:
-                    error=('Se ha producido un error al acceder a la api:',e)
-                    self.controlErrorCryptos.config(text=error)
+        if len(self.getFromCrypto.get()) != 0 and len(self.getToCrypto.get()) != 0:
+            strtxt=self.getFromCrypto.get()
+            _from = self.whatCrypto(strtxt)
+            strtxt = self.getToCrypto.get()
+            _to = self.whatCrypto(strtxt)
+            if _from !=' ' and _to != ' ' and _from != _to:
+                if self.strFrom_Q.get() != '0':
+                    try:
+                        url= price_conversion.format(self.strFrom_Q.get(),_from, _to, api_key)
+                        response=api_acces.accesoAPI(url)
+                        self.cryptoPriceTo=self.processingApiInfo(response,_to)
+                        if addDB == TRUE:
+                            #graba los datos en la DB y resetea todos los campos y los desactiva
+                            self.addNewTransactionIntoDB(_from, _to)
+                            self.switchNewTransaction(FALSE,TRUE)
+                    except Exception as e:
+                        error=('Se ha producido un error al acceder a la api:',e)
+                        self.controlErrorCryptos.config(text=error)
+                else:
+                    self.controlErrorCryptos.config(text='Debe introducir un valor válido en el campo Q')
             else:
-                self.controlErrorCryptos.config(text='Debe introducir un valor válido en el campo Q')
+                self.controlErrorCryptos.config(text='Las divisas del campro From deben ser distantas a las del campo To')
         else:
-            self.controlErrorCryptos.config(text='Las divisas del campro From deben ser distantas a las del campo To')
+            self.controlErrorCryptos.config(text='Los campos From y To deben estar informados')
         #funcio per comprovar que _from i _to són diferents si no no es pot fer la trucada y que els camps estan informats
         
 
-    def addNewTransactionIntoDB(self):
-        try:
-            checkTransaction()
-        except Exception as e:
-            error=('Se ha producido una incidencia:',e)
-            self.controlErrorCryptos.config(text=error)
-    
+    def addNewTransactionIntoDB(self,symbolCrypto_from, symbolCrypto_to):
+        data= time.strftime('%Y-%m-%d')
+        hour=datetime.datetime.now().strftime("%H:%M:%S.%f")
+        from_currency = movementsDB.getIdFromToCryptoDB(symbolCrypto_from)
+        to_currency = movementsDB.getIdFromToCryptoDB(symbolCrypto_to)
+        from_quantity= float(self.strFrom_Q.get())
+        to_quantity = '{0:.2f}'.format(self.cryptoPriceTo)
+        movementsDB.addNewMovement(data, hour, from_currency,to_currency,self.strFrom_Q.get(), self.cryptoPriceTo)
 
 
 
@@ -186,7 +226,8 @@ class NewTransaction(ttk.Frame):
         self.toCryptoCombo.config(values=result)
         self.fromCryptoCombo.config(values=result)
         
-    def switchNewTransaction(self, switch_On = TRUE,button1=FALSE, transactionButton=FALSE):
+        
+    def switchNewTransaction(self, switch_On = FALSE , transactionButton=FALSE):
         #esto es un interruptor que activa y desactiva el frame newtransaction, tambien desactiva el boton de nueva transacción hasta que cancela o se realiza la nueva transaccion
         if switch_On:
             switch_state='enable'
@@ -205,8 +246,10 @@ class NewTransaction(ttk.Frame):
         self.cancelButton.config(state= switch_state)
         self.acceptButton.config(state= switch_state)
         self.checkButton.config(state=switch_state)
+        
+        if transactionButton:
+            self.resetVariables()
         '''
-        if button1:
             NewTransaction.Simulador.button1.config(state='disable')
             self.Simulador.button1.config(state='disable')
             Simulador.button1.config(state='disable')
@@ -214,6 +257,14 @@ class NewTransaction(ttk.Frame):
         if transactionButton:
             self.Button1.config(state='enable')
         '''
+
+    def resetVariables(self):
+        self.controlErrorCryptos.config(text='')
+        self.toCryptoCombo.set('')
+        self.fromCryptoCombo.set('')
+        self.to_QLbl.config(text='')
+        self.pULbl.config(text='')
+        self.from_Q.config(value="1")
 
         
 
@@ -276,7 +327,7 @@ class Simulador(ttk.Frame):
         if not initDBCryptos:
             self.initializationBDCryptos()
         
-        self.Button1 = ttk.Button(self, text ='+', command=lambda: self.newTransaction.switchNewTransaction(button1=TRUE), width=3)
+        self.Button1 = ttk.Button(self, text ='+', command=lambda: self.newTransaction.switchNewTransaction(TRUE), width=3)
         self.Button1.place(x=830, y=40)
         #self.Button1.grid(column=0,row=3)
         #self.Button1.grid_propagate(0)
