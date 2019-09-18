@@ -6,6 +6,7 @@ import configparser
 import json
 import movementsDB
 import api_acces
+import tkinter as tk
 
 
 _width='800'
@@ -27,14 +28,38 @@ class Movements(ttk.Frame):
 
     def __init__(self, parent, **kwargs):
         ttk.Frame.__init__(self, height=kwargs['height'],width = kwargs['width'])
-        yscrollbar = Scrollbar(self)
+
         
         
+        self.frame = tk.Frame(self, background="#ffffff",width='800', height='240')
+        self.frame.grid(column=0, row=1,columnspan=7)
+        self.canvas = tk.Canvas(self.frame, borderwidth=1, relief=GROOVE, background="#ffffff", scrollregion=(0,0,0,1000))
+        self.verticaScrollbar = tk.Scrollbar(self.frame, orient="vertical", command=self.canvas.yview)
+        self.verticaScrollbar.pack(side=RIGHT, fill=Y)
+        self.canvas.config(width='800',height='240')
+        self.canvas.configure(yscrollcommand=self.verticaScrollbar.set)
+        self.canvas.pack(side=LEFT)
+        
+        #self.frame.bind("<Configure>", self.onFrameConfigure)
+        
+        self.printHeaders()
+        
+        self.printMovements()
+    '''
+    def onFrameConfigure(self, event):
+        #Reset the scroll region to encompass the inner frame
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))  
+    '''
+        
+
+    def printHeaders(self):    
         for i in range (0, 7):
             self.lblDisplay = ttk.Label(self, text=self._head[i], font=font, width = 11, background ='white', borderwidth=1,relief=GROOVE, anchor=CENTER)
             self.lblDisplay.grid(row=0, column=i, pady=_pady)
             self.lblDisplay.grid_propagate(0)
-        #yscrollbar.grid(row=1, column=i+1)
+        
+
+    def printMovements(self):
         movements=movementsDB.printMovementsDB()
         j=0
         for movement in movements:
@@ -47,29 +72,17 @@ class Movements(ttk.Frame):
                     movement.append(unitPrice)
                 if i == 2 or i == 4:
                     movement[i] = movementsDB.getIdFromToCryptoDB(movement[i],FALSE)
-                self.lblDisplay = ttk.Label(self, text=movement[i], font='Verdana, 10', width = 14, background ='white', borderwidth=1,relief=GROOVE, anchor=CENTER)
+                self.lblDisplay = ttk.Label(self.canvas, text=movement[i], font='Verdana, 10', width = 14, background ='white', borderwidth=1,relief=GROOVE, anchor=CENTER)
                 self.lblDisplay.grid(row=j, column=i)
                 self.lblDisplay.grid_propagate(0)
                 i+=1
-
-
         
-    #funcion button1   
-    def newMovement(self):
-        
-        
-        '''
-        llenar los campos con la base de datos, si id>6 hay que hacer un scroll
-        crear boton + command enable frame newTransaction y posicionar el raton
-        '''
-
-
-
 
 
 class NewTransaction(ttk.Frame):
     def __init__(self, parent, **kwargs):
         ttk.Frame.__init__(self, height=210, width =_width, borderwidth=2, relief= GROOVE)
+        self.simulador=parent
 
         #variables de control
         self.strFrom_Q = StringVar(value="1")
@@ -80,7 +93,6 @@ class NewTransaction(ttk.Frame):
         self.getFromCrypto = StringVar()
         self.getToCrypto = StringVar()
         
-       
         ttk.Label(self, text='Nueva transacción', width=20,font=font, anchor=CENTER).grid(column=0,row=0, columnspan=2, padx=2, pady=20, sticky=W)
         ttk.Label(self, text='From:', width=_lblwidth, font=font, anchor=E).grid(column=0, row=1, padx=_padx, pady=_pady)
         ttk.Label(self, text='Q:', width=_lblwidth, font=font, anchor=E).grid( column=0, row =2, padx=_padx, pady=_pady)
@@ -95,12 +107,11 @@ class NewTransaction(ttk.Frame):
         self.controlErrorCryptos = ttk.Label(self, font='Verdana 8', foreground='red', anchor=CENTER, text='')
         self.controlErrorCryptos.grid(column=0, row=4, columnspan=5)
         
-        self.from_Q = ttk.Entry(self, text='1', font=font, width=22, textvariable=self.strFrom_Q, justify=RIGHT, state='disable')
+        self.from_Q = ttk.Entry(self, text='', font=font, width=22, textvariable=self.strFrom_Q, justify=RIGHT, state='disable')
         self.from_Q.grid(column=1,row=2)
         
         self.fromCryptoCombo = ttk.Combobox(self, width=20, font=font, textvariable=self.getFromCrypto,values=NONE, state='disable')
         self.fromCryptoCombo.grid(column=1, row=1)
-        self.fromCryptoCombo.bind('<<ComboboxSelected>>', self.validationQuantity)
         self.toCryptoCombo = ttk.Combobox(self, width=20, font=font, textvariable= self.getToCrypto, values=NONE, state='disable')
         self.toCryptoCombo.grid(column=3, row=1)
         self.valuesComboBox()
@@ -120,105 +131,106 @@ class NewTransaction(ttk.Frame):
             symbolCrypto +=crypto[i]
             i+=1
         return(symbolCrypto)
+    
+    def strCleaner(self):
+        #eliminamos los espacios
+        strcleaned=''
+        for i in range (len(self.strFrom_Q.get())):
+            if self.strFrom_Q.get()[i] != ' ':
+                strcleaned += self.strFrom_Q.get()[i]
+        return(strcleaned) 
 
-    def validationQuantity(self, *args):
-        #validar a la base de dades que realment disposem de les cryptos per vendre-les
-        strtxt = self.getFromCrypto.get()
-        self._from =self.whatCrypto(strtxt)
-        
-        if self._from != 'EUR':
-            calculateCryptoto=movementsDB.MoneySpend(self._from,FALSE)
-            calculateCryptofrom=movementsDB.MoneySpend(self._from)
-            self.cryptoInvertida = calculateCryptoto - calculateCryptofrom
-            if self.cryptoInvertida == 0:
-                self.controlErrorCryptos.config(text='no ha invertido en {}'.format(self._from))
-                self.entryValidationFrom()
-
-            else:
-                strcryptoInvertida = ('Dispone de {} {} para invertir'.format(self.cryptoInvertida,self._from))
-                self.controlErrorCryptos.config(text=strcryptoInvertida)
-        else:
-            self.controlErrorCryptos.config(text=' ')
-            self.entryValidationFrom()
-
-        
     def entryValidationFrom(self, *args):
-        #validamos que solo permita entrar números y que si esta informado el tipo de monedas el valor no sea superior a las que tengamos, excepto que el tipo de moneda sea euro
-        valorMAximoPermitidoApi = 1000000000
+        #validamos que solo entren valores numéricos y no tenga espacios
+        
         try:
-            v=float(self.strFrom_Q.get())
-            if v <= valorMAximoPermitidoApi:
-                self.strOldFrom_Q = self.strFrom_Q.get()
-                if v <= valorMAximoPermitidoApi and self._from == 'EUR':
-                    self.controlErrorCryptos.config(text='')
-                if self._from != 'EUR':
-                    #self.cryptoInvertida=str(self.cryptoInvertida)
-                    if self.cryptoInvertida < v:
-                        self.controlErrorCryptos.config(text='Su saldo actual de {} es de: {}. No podrá realizar la operación, modifique el valor o la moneda'.format(self._from,self.cryptoInvertida))
-                        self.strFrom_Q.set(self.cryptoInvertida)
-                        self.strOldFrom_Q=self.cryptoInvertida
-                        if float(self.strFrom_Q.get()) > self.cryptoInvertida:
-                            self.strFrom_Q.set(self.strOldFrom_Q)
-                    else:
-                        self.controlErrorCryptos.config(text='')
-            else:
-                self.strFrom_Q.set(self.strOldFrom_Q)
-                self.controlErrorCryptos.config(text='El valor introducido debe ser menor a 1000000000')
-        except Exception as e:
+            self.floatFrom_Q = float(self.strFrom_Q.get())
+            self.strFrom_Q.set(self.strCleaner())
+            self.strOldFrom_Q = self.strFrom_Q.get()
+        except:
             self.strFrom_Q.set(self.strOldFrom_Q)
-            print('error',e)
-
+    
     def processingApiInfo(self, response, cryptoname):
         #procesamos la informacion para conseguir el precio y calculamos el unitario
         values= json.loads(response)
         valorQ = values['data']['quote'][cryptoname]['price']
         priceU = float(self.strFrom_Q.get())/valorQ
-        valorQ="{0:.2f}".format(valorQ)
-        priceU="{0:.2f}".format(priceU)
         self.to_QLbl.config(text=valorQ)
         self.pULbl.config(text=priceU)
         return(valorQ)
-        
-      
-    def checkTransaction(self,addDB=TRUE):
-        #verificamos que todos los campos esten informados y que las cryptos de to y from sean distintas, si se cumple todo esto hacemos la llamada
+    
+    def informedAndDiferentCombo(self):
+        #comprobamos que los combos esten informados,m sean diferentes y que el valor de Q sea distinto a 0
         if len(self.getFromCrypto.get()) != 0 and len(self.getToCrypto.get()) != 0:
-            strtxt=self.getFromCrypto.get()
-            _from = self.whatCrypto(strtxt)
-            strtxt = self.getToCrypto.get()
-            _to = self.whatCrypto(strtxt)
-            if _from !=' ' and _to != ' ' and _from != _to:
-                if self.strFrom_Q.get() != '0':
-                    try:
-                        url= price_conversion.format(self.strFrom_Q.get(),_from, _to, api_key)
-                        response=api_acces.accesoAPI(url)
-                        self.cryptoPriceTo=self.processingApiInfo(response,_to)
-                        if addDB == TRUE:
-                            #graba los datos en la DB y resetea todos los campos y los desactiva
-                            self.addNewTransactionIntoDB(_from, _to)
-                            self.switchNewTransaction(FALSE,TRUE)
-                    except Exception as e:
-                        error=('Se ha producido un error al acceder a la api:',e)
-                        self.controlErrorCryptos.config(text=error)
-                else:
-                    self.controlErrorCryptos.config(text='Debe introducir un valor válido en el campo Q')
+            self._from = self.whatCrypto(self.getFromCrypto.get())
+            self._to = self.whatCrypto(self.getToCrypto.get())
+            if self._from != self._to and self.strFrom_Q.get() != '0':
+                return (TRUE)
             else:
-                self.controlErrorCryptos.config(text='Las divisas del campro From deben ser distantas a las del campo To')
+                self.controlErrorCryptos.config(text='Los campos From y To deben ser distintos y el valor Q mayor que 0')
+                return(FALSE)
+            
         else:
             self.controlErrorCryptos.config(text='Los campos From y To deben estar informados')
-        #funcio per comprovar que _from i _to són diferents si no no es pot fer la trucada y que els camps estan informats
+            return(FALSE)   
         
+    def valueFromQValidate(self):
+        maximumValueApi = 1000000000
+        if float(self.strFrom_Q.get())<= maximumValueApi and self._from == 'EUR':
+            return(TRUE)
+        elif self._from != 'EUR' and float(self.strFrom_Q.get())<= maximumValueApi:
+            calculateCryptoto=movementsDB.MoneySpend(self._from,FALSE)
+            calculateCryptofrom=movementsDB.MoneySpend(self._from)
+            self.cryptoInvertida = calculateCryptoto - calculateCryptofrom
+            if self.cryptoInvertida < float(self.strFrom_Q.get()):
+                #desactivar botones de aceptar y potser calcular
+                self.acceptButton.config(state= 'disable')
+                self.controlErrorCryptos.config(text='Actualmente dispones de {} {}. Modifique el valor para realizar la transacción'.format(self.cryptoInvertida,self._from))
+                return(FALSE)
+            else:
+                return(TRUE)  
+        else:
+            return(FALSE)
+        
+    def validateAllValues(self):
+        fromAndToDiferentBol = self.informedAndDiferentCombo()
+        if fromAndToDiferentBol:
+            valueStatus = self.valueFromQValidate()
+            if valueStatus:
+                return(TRUE)
+            else:
+                return(FALSE)
+        else:
+            return(FALSE)
+    
+    def checkTransaction(self, addDB=TRUE):
+        #comprobamos que combos sean distintos y el valor no sea 0 y hacemos la llamada a la api
+        allValuesValidate = self.validateAllValues()
+        if allValuesValidate:
+            self.acceptButton.config(state= 'enable')
+            self.controlErrorCryptos.config(text=' ')
+            try:
+                url= price_conversion.format(self.strFrom_Q.get(),self._from, self._to, api_key)
+                response=api_acces.accesoAPI(url)
+                self.cryptoPriceTo=self.processingApiInfo(response,self._to)
+                if addDB == TRUE:
+                    #graba los datos en la DB y resetea todos los campos y los desactiva
+                    self.addNewTransactionIntoDB(self._from, self._to)
+                    self.switchNewTransaction(FALSE,TRUE)
+                    self.simulador.addNewMovementintoMovement()
+            except Exception as e:
+                error=('Se ha producido una incidencia:',e)
+                self.controlErrorCryptos.config(text=error)
 
     def addNewTransactionIntoDB(self,symbolCrypto_from, symbolCrypto_to):
-        data= time.strftime('%Y-%m-%d')
+        #procesar y obtener toda la información que necesitamos para la DB
+        data = time.strftime('%Y-%m-%d')
         hour=datetime.datetime.now().strftime("%H:%M:%S.%f")
+        hour = hour[:(len(hour)-3)]
         from_currency = movementsDB.getIdFromToCryptoDB(symbolCrypto_from)
         to_currency = movementsDB.getIdFromToCryptoDB(symbolCrypto_to)
         from_quantity= float(self.strFrom_Q.get())
-        to_quantity = '{0:.2f}'.format(self.cryptoPriceTo)
         movementsDB.addNewMovement(data, hour, from_currency,to_currency,self.strFrom_Q.get(), self.cryptoPriceTo)
-
-
 
     def valuesComboBox(self):
         #informar ComboBox con las cryptos
@@ -248,28 +260,19 @@ class NewTransaction(ttk.Frame):
         self.checkButton.config(state=switch_state)
         
         if transactionButton:
-            self.resetVariables()
-        '''
-            NewTransaction.Simulador.button1.config(state='disable')
-            self.Simulador.button1.config(state='disable')
-            Simulador.button1.config(state='disable')
-            #self.config(state='disable')
-        if transactionButton:
-            self.Button1.config(state='enable')
-        '''
-
+            self.resetVariables()    
+        
     def resetVariables(self):
         self.controlErrorCryptos.config(text='')
         self.toCryptoCombo.set('')
         self.fromCryptoCombo.set('')
         self.to_QLbl.config(text='')
         self.pULbl.config(text='')
-        self.from_Q.config(value="1")
-
+        self.strOldFrom_Q='1'
+        self.strFrom_Q.set(self.strOldFrom_Q)
         
 
-
-    
+ 
 class Results(ttk.Frame):
     def __init__(self, parent, **kwargs):
         ttk.Frame.__init__(self, height=kwargs['height'],width = kwargs['width'])
@@ -282,39 +285,55 @@ class Results(ttk.Frame):
         self.currentValueLbl=ttk.Label(self, font=font,background ='white', relief=GROOVE, anchor=E, width=22)
         self.currentValueLbl.grid(column=3, row=3, padx=_padx)
         #control d'errors si la inversió o els guanys superent les 15 xifres amb comes i punts
-
-        calculate=ttk.Button(self, text='Calcular', command=lambda: earnings()).grid(column=4, row=3, padx= 30)
-    #funcion calculatebutton
-    def earnings(self):
-
-        
-
-        moneySPEND = moneySpend()
-        currentVALUE = currentValue()
-
-        self.moneySpendLbl.config(text=moneySPEND)
-        self.currentValueLbl.config(text=currentVALUE)
-
-    def moneySpend(self):
-        fromEUR = movementsDB.MoneySpendFromEURDB()
-        toEUR = movementsDB.MoneySpendTOEURDB()
-        return(fromEUR-toEUR)#formatejar la sortida decimals
+        calculate=ttk.Button(self, text='Calcular', command=lambda: self.earnings()).grid(column=4, row=3, padx= 30)
     
-    def currentValue(self):
-        #agafar la llista de totes les posibles monedes
-        cryptos = movementsDB.listCryptos()
-        currentValueResult = 0
-        for crypto in cryptos:
-            if crypto[0] != 'EUR':
-                #mentres sigui una crypto que les busqui i les sumi
-                #query per trobar la crypto 
-                sumatorioFromCrypto= movementsDB.MoneySpendFromEURDB(crypto[0])
-                sumatorioToCrypto = movementsDB.MoneySpendTOEURDB(crypto[0])
-                result=sumatorioFromCrypto - sumatorioToCrypto
-                #cridar a l'api amb l'endpoint i si response_code==200 fer la conversio
-                #currentValueResult+= #variable retornada de la funcio de resposta
+    def moneySpend(self):
+        #calculamos el total de euros invertidos
+        eurosFrom=movementsDB.MoneySpend('EUR')
+        eurosTo=movementsDB.MoneySpend('EUR',FALSE)
+        totalMoneySpend = eurosFrom - eurosTo
+        totalMoneySpend = ('{0:.2f}€'.format(totalMoneySpend))
+        self.moneySpendLbl.config(text=totalMoneySpend)
 
-        return(currentValueResult)
+    def calculateCurrentValueApi(self, resultCurrentValue,cryptoSymbolFrom):
+        #primero verificamos que hayamos invertido en la crypto en cuestion, si es asi hacemos la llamada a la api para obtener su valor en euros
+        if resultCurrentValue != 0:
+            try:
+                url= price_conversion.format(resultCurrentValue,cryptoSymbolFrom, 'EUR', api_key)
+                response=api_acces.accesoAPI(url)
+                resultCryptoToEuro= json.loads(response)
+                currentValueResult = resultCryptoToEuro['data']['quote']['EUR']['price']
+                return (currentValueResult)
+            except Exception as e:
+                print('Fallo acceso:',e)
+        else:
+            return(0)
+    
+    def currentValue(self,cryptos):
+        #recorremos con el for todas las cryptos excepto eur y calculamos por cada crypto en from y to
+        totalCurrentValuesResults = 0
+        for i in range (len(cryptos)-1):
+            sumatorioFromCrypto= movementsDB.MoneySpend(cryptos[i])
+            sumatorioToCrypto = movementsDB.MoneySpend(cryptos[i], FALSE)
+            result= sumatorioToCrypto - sumatorioFromCrypto       
+            totalCurrentValuesResults += self.calculateCurrentValueApi(result,cryptos[i])
+        totalCurrentValuesResults = ('{0:.2f}€'.format(totalCurrentValuesResults))   
+        self.currentValueLbl.config(text=totalCurrentValuesResults)
+    
+    def earnings(self):
+        #verificamos que haya movimientos en movementsDB
+        
+        
+        #conseguir las crytos y las cryptos de from y to
+        cryptoSymbol=movementsDB.symbolCrytpo()
+        
+        self.moneySpend()
+        self.currentValue(cryptoSymbol)
+    
+    def resetLabels(self):
+        #Cuando se quiere hacer un nuevo movimiento se resetean las labels de resultado
+        self.moneySpendLbl.config(text='')
+        self.currentValueLbl.config(text='')
             
     
         
@@ -322,15 +341,13 @@ class Results(ttk.Frame):
 class Simulador(ttk.Frame):
     def __init__(self, parent):
         ttk.Frame.__init__(self, width='900', height='600')
-        
+        #comprobamos si la tabla cryptos de DB está informada, sino lo está, la inicializamos 
         initDBCryptos= movementsDB.inicialVerification()
         if not initDBCryptos:
             self.initializationBDCryptos()
-        
-        self.Button1 = ttk.Button(self, text ='+', command=lambda: self.newTransaction.switchNewTransaction(TRUE), width=3)
+        #disenyo y estructuración de la aplicación
+        self.Button1 = ttk.Button(self, text ='+', command=lambda: self.buttonSimulador(), width=3)
         self.Button1.place(x=830, y=40)
-        #self.Button1.grid(column=0,row=3)
-        #self.Button1.grid_propagate(0)
 
         self.movements =Movements(self, height=275, width= _width)
         self.movements.grid(column=0, row=0)
@@ -339,16 +356,22 @@ class Simulador(ttk.Frame):
         self.newTransaction= NewTransaction(self, height=220, width=_width)
         self.newTransaction.grid(column=0, row=1, padx=20)
         self.newTransaction.grid_propagate(0)
-        #movements.newTransaccion = newTransaction
 
         self.results = Results(self, height=100, width=_width)
         self.results.grid(column=0, row=2, pady=40)
         self.results.grid_propagate(0)
 
-    def initializationBDCryptos(self):
-
-        url = cryptos.format(api_key)
+    def addNewMovementintoMovement(self):
+        self.movements.printMovements()
         
+    def buttonSimulador(self):
+        #activamos las labels de newtransaction y limpiamos las labels de results
+        self.newTransaction.switchNewTransaction(TRUE)
+        self.results.resetLabels()
+
+    def initializationBDCryptos(self):
+        #llamamos a la api para conseguir el name y symbol de las cryptos que usaremos
+        url = cryptos.format(api_key)
         try:
             callback= api_acces.accesoAPI(url)
         except api_acces.accesError as e:
@@ -357,19 +380,18 @@ class Simulador(ttk.Frame):
         self.getCryptos(callback)    
 
     def getCryptos(self, txt):
+        #procesamos los datos que nos devuelve la apicall y los grabamos en la DB y añadimos el euro
         currencies= json.loads(txt)
         results= {}
         symbols = currencies['data']
         
         i=0
-        
         for symbol in symbols:
             results[i] = symbol['symbol'], symbol['name']
             i+=1
         results[i] = ('EUR', 'Euro')
         movementsDB.CryptosDBInformed(results)
 
-    
 
 class MainApp(Tk):
 
@@ -378,10 +400,8 @@ class MainApp(Tk):
         self.geometry("900x650")
         self.title("CRYPTO INVERSIONS")
         self.resizable(0,0)
-        #self.configure(background='white')
         self.simulador = Simulador(self)
         self.simulador.place(x=0, y=0)
-    
        
     def start(self):
         self.mainloop()

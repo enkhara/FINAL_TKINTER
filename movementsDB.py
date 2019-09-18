@@ -122,8 +122,11 @@ def MoneySpend(crypto, isfrom=True ):
     try:
         rows=cursor.execute(query,(crypto,))
         valor=0
-        for row in rows:
-            valor+=row[0]
+        try:
+            for row in rows:
+                valor+=row[0]
+        except Exception as e:
+            print('es en el for',e)
             
     except Exception as e:
         print('Error en base de datos:',e)
@@ -150,7 +153,19 @@ def getIdFromToCryptoDB(crypto, isCrytpo = True):
     n=cursor.fetchone()
     return (n[0])
   
-    
+def symbolCrytpo():
+    conn = sqlite3.connect(database)
+    cursor = conn.cursor()
+
+    query='''
+        SELECT symbol
+        FROM cryptos;
+    '''
+    rows=cursor.execute(query)
+    symbol = []
+    for row in rows:
+        symbol.append(row[0])
+    return (symbol)
 
 
 
