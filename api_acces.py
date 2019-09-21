@@ -17,4 +17,4 @@ def accesoAPI(url):
 
         if response.status_code == 200:
             return(response.text)
-        #else con control de errores
+        

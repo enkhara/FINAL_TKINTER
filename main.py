@@ -9,7 +9,7 @@ import api_acces
 import tkinter as tk
 
 
-_width='800'
+_width='900'
 _lblwidth = 10
 font='Verdana 10 bold'
 _pady=8
@@ -27,57 +27,73 @@ class Movements(ttk.Frame):
     newTransaccion =NONE
 
     def __init__(self, parent, **kwargs):
+        #creamos el Scrollbar y pintamos los movimientos obtenidos de movementsDB
         ttk.Frame.__init__(self, height=kwargs['height'],width = kwargs['width'])
 
-        
-        
-        self.frame = tk.Frame(self, background="#ffffff",width='800', height='240')
-        self.frame.grid(column=0, row=1,columnspan=7)
-        self.canvas = tk.Canvas(self.frame, borderwidth=1, relief=GROOVE, background="#ffffff", scrollregion=(0,0,0,1000))
-        self.verticaScrollbar = tk.Scrollbar(self.frame, orient="vertical", command=self.canvas.yview)
-        self.verticaScrollbar.pack(side=RIGHT, fill=Y)
-        self.canvas.config(width='800',height='240')
-        self.canvas.configure(yscrollcommand=self.verticaScrollbar.set)
-        self.canvas.pack(side=LEFT)
-        
-        #self.frame.bind("<Configure>", self.onFrameConfigure)
-        
         self.printHeaders()
+
+        self.marcoFrame= Frame(self, bd=2, relief=GROOVE,padx=2, pady=2)
+        self.marcoFrame.grid(column=0, row=1, columnspan=8)
+        
+        
+        self.verticaScrollbar = Scrollbar(self.marcoFrame)
+        self.verticaScrollbar.grid(row=0, column=1,sticky=N+S)
+        self.verticaScrollbar.grid_columnconfigure(1,weight=1)
+        self.canvas = Canvas(self.marcoFrame, yscrollcommand=self.verticaScrollbar.set)
+        
+        self.canvas.grid(row=0, column=0, sticky=N+S+E+W)
+        self.canvas.config(width=810,height= 180)
+        self.canvas.grid_propagate(0)
+        self.verticaScrollbar.config(command=self.canvas.yview)
+       
+        self.frame = Frame(self.canvas, width=810, height= 180)
         
         self.printMovements()
-    '''
-    def onFrameConfigure(self, event):
-        #Reset the scroll region to encompass the inner frame
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))  
-    '''
+          
+        self.canvas.create_window(0,0, anchor=NW, window=self.frame)
         
-
-    def printHeaders(self):    
+        self.frame.update_idletasks()
+        self.canvas.config(scrollregion= self.canvas.bbox('all'))
+        
+    def printHeaders(self): 
+        #pintamos las cabeceras   
         for i in range (0, 7):
-            self.lblDisplay = ttk.Label(self, text=self._head[i], font=font, width = 11, background ='white', borderwidth=1,relief=GROOVE, anchor=CENTER)
-            self.lblDisplay.grid(row=0, column=i, pady=_pady)
+            self.lblDisplay = tk.Label(self, text=self._head[i], font='verdana, 10', width = 13, background ='white', borderwidth=1,relief=GROOVE, anchor=CENTER)
+            self.lblDisplay.grid(row=0, column=i, pady=1)
             self.lblDisplay.grid_propagate(0)
-        
+           
 
-    def printMovements(self):
-        movements=movementsDB.printMovementsDB()
-        j=0
-        for movement in movements:
-            j+=1
+    def addUnitPriceIntoMovements(self):
+        #Calculamos y añadimos el precio unitario y cambiamos la id_crypto por el symbol_crypto
+        self.movements=movementsDB.printMovementsDB()
+        for movement in self.movements:
             i=0
             while i <=6:
                 if i ==6:
-                    unitPrice=movement[3]/movement[5]
-                    unitPrice='{0:.2f}'.format(unitPrice)
+                    unitPrice=movement[3]/(movement[5])
                     movement.append(unitPrice)
                 if i == 2 or i == 4:
                     movement[i] = movementsDB.getIdFromToCryptoDB(movement[i],FALSE)
-                self.lblDisplay = ttk.Label(self.canvas, text=movement[i], font='Verdana, 10', width = 14, background ='white', borderwidth=1,relief=GROOVE, anchor=CENTER)
+                i += 1
+    
+    def printMovements(self): 
+        #formateamos las salidas con 5 decimales máx. y pintamos los movimientos y actualizamos el scrollregion para mostrar el nuevo movimiento
+        self.addUnitPriceIntoMovements()
+        j=0
+        for movement in self.movements:
+            i=0
+            while i <=6:
+                if i == 3 or i == 5 or i == 6:
+                    movement[i]='{0:.5f}'.format(movement[i])
+                self.lblDisplay = ttk.Label(self.frame, text=movement[i], font='Verdana, 10',width= 16, background ='white', borderwidth=1,relief=GROOVE, anchor=CENTER)
                 self.lblDisplay.grid(row=j, column=i)
                 self.lblDisplay.grid_propagate(0)
+                if i == 3 or i == 5 or i == 6:
+                    self.lblDisplay.config(anchor= E)
                 i+=1
-        
-
+            j += 1
+        self.canvas.config(scrollregion= self.canvas.bbox('all'))
+        self.canvas.config(scrollregion= self.canvas.bbox('all'))
 
 class NewTransaction(ttk.Frame):
     def __init__(self, parent, **kwargs):
@@ -88,7 +104,6 @@ class NewTransaction(ttk.Frame):
         self.strFrom_Q = StringVar(value="1")
         self.strOldFrom_Q = self.strFrom_Q.get()
         self.strFrom_Q.trace('w', self.entryValidationFrom)
-        #quan escribim un valor(w) fa la validació(self.entryVAlidationFrom) si no es un número recupera l'últim valor validat(self.strOldFrom_Q)
 
         self.getFromCrypto = StringVar()
         self.getToCrypto = StringVar()
@@ -112,8 +127,10 @@ class NewTransaction(ttk.Frame):
         
         self.fromCryptoCombo = ttk.Combobox(self, width=20, font=font, textvariable=self.getFromCrypto,values=NONE, state='disable')
         self.fromCryptoCombo.grid(column=1, row=1)
+        self.fromCryptoCombo.bind("<<ComboboxSelected>>", self.selectNewCryptoInComboBox)
         self.toCryptoCombo = ttk.Combobox(self, width=20, font=font, textvariable= self.getToCrypto, values=NONE, state='disable')
         self.toCryptoCombo.grid(column=3, row=1)
+        self.toCryptoCombo.bind("<<ComboboxSelected>>", self.selectNewCryptoInComboBox)
         self.valuesComboBox()
 
         self.acceptButton = ttk.Button(self, text='Aceptar', command=lambda: self.checkTransaction(), state='disable')
@@ -122,6 +139,11 @@ class NewTransaction(ttk.Frame):
         self.cancelButton.grid(column=4, row=2, padx=30, pady=_pady)
         self.checkButton = ttk.Button(self, text = 'Comprobar', command =lambda: self.checkTransaction(FALSE), state='disable')
         self.checkButton.grid(column=4, row=3, padx=30, pady=_pady)
+    
+    def selectNewCryptoInComboBox(self, event):
+        #vuelve a activar el boton aceptar y limpia la label 
+        self.acceptButton.config(state='enable')
+        self.controlErrorCryptos.config(text=' ')
 
     def whatCrypto(self,crypto):
         #while para obtener el symbol de la crypto seleccionada
@@ -142,11 +164,13 @@ class NewTransaction(ttk.Frame):
 
     def entryValidationFrom(self, *args):
         #validamos que solo entren valores numéricos y no tenga espacios
-        
         try:
             self.floatFrom_Q = float(self.strFrom_Q.get())
             self.strFrom_Q.set(self.strCleaner())
             self.strOldFrom_Q = self.strFrom_Q.get()
+            if float(self.strFrom_Q.get())<= self.cryptoInvertida:
+                self.acceptButton.config(state= 'enable')
+                self.controlErrorCryptos.config(text=' ')
         except:
             self.strFrom_Q.set(self.strOldFrom_Q)
     
@@ -154,6 +178,7 @@ class NewTransaction(ttk.Frame):
         #procesamos la informacion para conseguir el precio y calculamos el unitario
         values= json.loads(response)
         valorQ = values['data']['quote'][cryptoname]['price']
+        controlCorrectPriceCrypto(valorQ)
         priceU = float(self.strFrom_Q.get())/valorQ
         self.to_QLbl.config(text=valorQ)
         self.pULbl.config(text=priceU)
@@ -168,8 +193,8 @@ class NewTransaction(ttk.Frame):
                 return (TRUE)
             else:
                 self.controlErrorCryptos.config(text='Los campos From y To deben ser distintos y el valor Q mayor que 0')
-                return(FALSE)
-            
+                self.acceptButton.config(state='disable')
+                return(FALSE)    
         else:
             self.controlErrorCryptos.config(text='Los campos From y To deben estar informados')
             return(FALSE)   
@@ -237,8 +262,7 @@ class NewTransaction(ttk.Frame):
         result = movementsDB.listCryptos()
         self.toCryptoCombo.config(values=result)
         self.fromCryptoCombo.config(values=result)
-        
-        
+       
     def switchNewTransaction(self, switch_On = FALSE , transactionButton=FALSE):
         #esto es un interruptor que activa y desactiva el frame newtransaction, tambien desactiva el boton de nueva transacción hasta que cancela o se realiza la nueva transaccion
         if switch_On:
@@ -268,11 +292,10 @@ class NewTransaction(ttk.Frame):
         self.fromCryptoCombo.set('')
         self.to_QLbl.config(text='')
         self.pULbl.config(text='')
+        self.cryptoInvertida=0
         self.strOldFrom_Q='1'
         self.strFrom_Q.set(self.strOldFrom_Q)
         
-
- 
 class Results(ttk.Frame):
     def __init__(self, parent, **kwargs):
         ttk.Frame.__init__(self, height=kwargs['height'],width = kwargs['width'])
@@ -334,9 +357,6 @@ class Results(ttk.Frame):
         #Cuando se quiere hacer un nuevo movimiento se resetean las labels de resultado
         self.moneySpendLbl.config(text='')
         self.currentValueLbl.config(text='')
-            
-    
-        
 
 class Simulador(ttk.Frame):
     def __init__(self, parent):
@@ -347,19 +367,19 @@ class Simulador(ttk.Frame):
             self.initializationBDCryptos()
         #disenyo y estructuración de la aplicación
         self.Button1 = ttk.Button(self, text ='+', command=lambda: self.buttonSimulador(), width=3)
-        self.Button1.place(x=830, y=40)
+        self.Button1.place(x=870, y=40)
 
-        self.movements =Movements(self, height=275, width= _width)
-        self.movements.grid(column=0, row=0)
-        self.movements.grid_propagate(0)
+        self.movements =Movements(self, height=240, width= _width)
+        #self.movements.grid(column=0, row=0, padx=20)
+        self.movements.place(x=20,y=20)
         
         self.newTransaction= NewTransaction(self, height=220, width=_width)
-        self.newTransaction.grid(column=0, row=1, padx=20)
-        self.newTransaction.grid_propagate(0)
+        #self.newTransaction.grid(column=0, row=1, padx=20)
+        self.newTransaction.place(x=20, y=260)
 
         self.results = Results(self, height=100, width=_width)
-        self.results.grid(column=0, row=2, pady=40)
-        self.results.grid_propagate(0)
+        #self.results.grid(column=0, row=2, pady=40)
+        self.results.place(x=40, y=500)
 
     def addNewMovementintoMovement(self):
         self.movements.printMovements()
@@ -392,12 +412,11 @@ class Simulador(ttk.Frame):
         results[i] = ('EUR', 'Euro')
         movementsDB.CryptosDBInformed(results)
 
-
 class MainApp(Tk):
 
     def __init__(self):
         Tk.__init__(self)
-        self.geometry("900x650")
+        self.geometry("920x600")
         self.title("CRYPTO INVERSIONS")
         self.resizable(0,0)
         self.simulador = Simulador(self)
@@ -405,7 +424,6 @@ class MainApp(Tk):
        
     def start(self):
         self.mainloop()
-
 
 if __name__ == '__main__':
     app = MainApp()
