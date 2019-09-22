@@ -398,7 +398,6 @@ class Simulador(ttk.Frame):
            
     def buttonSimulador(self):
         #activamos las labels de newtransaction y limpiamos las labels de results
-        self.movements.actualizarScrollregion()
         self.newTransaction.switchNewTransaction(TRUE)
         self.results.resetLabels()
 
