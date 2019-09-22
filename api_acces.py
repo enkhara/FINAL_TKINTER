@@ -5,16 +5,14 @@ def accesError(Exception):
     self.cause = cause
 
 def accesoAPI(url):
-        print(url)
-        try:
-            response= requests.get(url)
-            print(response.status_code)
-        
-        except requests.exceptions.ConnectionError as e:
-            print('error en acceso API')
-        except Exception as e:
-            print (e)
+    #con la url que le pasamos hace la llamada
+    try:
+        response= requests.get(url)    
+    except requests.exceptions.ConnectionError as e:
+        print('error en acceso API')
+    except Exception as e:
+        print (e)
 
-        if response.status_code == 200:
-            return(response.text)
-        
+    if response.status_code == 200:
+        return(response.text)
+    

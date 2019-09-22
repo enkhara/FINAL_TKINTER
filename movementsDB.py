@@ -4,7 +4,6 @@ database = ('data/movements.db')
 
 def inicialVerification():
     #para saber si la DB está vacía o ya está informada
-    #cursor.fetchone() devuelve una unica secuencia o ninguna si no hay mas datos disponibles
     conn = sqlite3.connect(database)
     cursor =  conn.cursor()
 
@@ -59,7 +58,6 @@ def listCryptos():
 
 def printMovementsDB():
     #devuelve todos los movimientos que hay en DB
-
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
 
@@ -75,7 +73,6 @@ def printMovementsDB():
 
 def addNewMovement(data, time, from_currency, to_currency,from_quantity, to_quantity):
    #añadidmos un nuevo movimiento en DB
-    
     conn =  sqlite3.connect(database)
     cursor = conn.cursor()
 
@@ -100,7 +97,7 @@ def addNewMovement(data, time, from_currency, to_currency,from_quantity, to_quan
     conn.close()
 
 def MoneySpend(crypto, isfrom=True ):
-    #bucamos en la DB y devolvemos la suma de todos las cantidades de una misma momenda en to (isfrom=false) o en from(isfrom=true) 
+    #buscamos en la DB y devolvemos la suma de todos las cantidades de una misma momenda en to (isfrom=false) o en from(isfrom=true) 
     if isfrom:
         fieldSelect = 'from_quantity'
         fieldWhere = 'from_currency'
@@ -134,6 +131,7 @@ def MoneySpend(crypto, isfrom=True ):
     return(valor)
 
 def getIdFromToCryptoDB(crypto, isCrytpo = True):
+    # obtenemos en symbolo a partir de la id o al contrario dependiendo de si isCrypto
     if isCrytpo:
         fieldSelect = 'id'
         fieldWhere = 'symbol'
@@ -154,6 +152,7 @@ def getIdFromToCryptoDB(crypto, isCrytpo = True):
     return (n[0])
   
 def symbolCrytpo():
+    #obtenemos el symbol de las cryptos en la tabla cryptos
     conn = sqlite3.connect(database)
     cursor = conn.cursor()
 
